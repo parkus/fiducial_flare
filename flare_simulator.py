@@ -150,8 +150,6 @@ def flare_series(time_span, **flare_params):
     return t_flare, eqd
 
 
-def fiducial_flare_cube(wbins, SiIVenergy, timescale):
-    pass
 def flare_series_lightcurve(tbins, **flare_params):
 
     time_span = tbins[-1] - tbins[0]
@@ -165,6 +163,12 @@ def flare_series_lightcurve(tbins, **flare_params):
 
 def flare_spectrum(wbins, SiIVenergy):
     return rebin(wbins, eb_bins, eb_density)*SiIVenergy
+
+
+def flare_series_spectra(wbins, tbins, SiIV_quiescent, **flare_params):
+    lightcurve = flare_series_lightcurve(tbins, **flare_params)
+    spectrum = flare_spectrum(wbins, SiIV_quiescent)
+    return np.outer(lightcurve, spectrum)
 
 
 def rebin(bins_new, bins_old, y):
