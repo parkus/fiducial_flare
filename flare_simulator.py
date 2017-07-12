@@ -71,39 +71,6 @@ def shot_times(rate, time_span):
         return tshot[tshot < time_span]
 
 
-def flare_rate(**kws):
-    values = _kw_or_default(kws, ['eqd_min', 'eqd_max', 'ks_rate', 'cumulative_index'])
-    eqd_min, eqd_max, ks_rate, cumulative_index = values
-    [_check_unit(flare_rate, v, 's') for v in [eqd_min, eqd_max, ks_rate]]
-
-    if eqd_min <= 0:
-        raise ValueError('Flare rate diverges at eqd_min == 0. Only eqd_min > 0 makes sense.')
-    rate = ks_rate * ((eqd_min/u.ks)**-cumulative_index - (eqd_max/u.ks)**-cumulative_index)
-    return rate.to('d-1')
-
-
-def flare_series(time_span, **kws):
-    values = _kw_or_default(kws, ['eqd_min', 'eqd_max', 'ks_rate', 'cumulative_index'])
-    eqd_min, eqd_max, ks_rate, cumulative_index = values
-    [_check_unit(flare_rate, v, 's') for v in [eqd_min, eqd_max, ks_rate]]
-
-    # get the expected flare rate
-    rate = flare_rate(**kws)
-
-    # draw flares at that rate
-    tunit = time_span.unit
-    rate = rate.to(tunit**-1).value
-    time_span = time_span.value
-    t_flare = shot_times(rate, time_span) * tunit
-    n = len(t_flare)
-
-    # draw energies for those flares
-    eqd_min, eqd_max = [x.to(tunit).value for x in [eqd_min, eqd_max]]
-    eqd = power_rv(eqd_min, eqd_max, cumulative_index, n) * tunit
-
-    return t_flare, eqd
-
-
 def boxcar_decay(tbins, t0, area_box, width_box, area_decay):
     if any(isinstance(x, u.Quantity) for x in [tbins, t0, area_box, width_box, area_decay]):
         raise ValueError('No astropy Quantity input for this function, please.')
@@ -129,9 +96,9 @@ def boxcar_decay(tbins, t0, area_box, width_box, area_decay):
     return rebin(tbins, t, y)
 
 
-def flare_lightcurve(tbins, t0, eqd, **kws):
+def flare_lightcurve(tbins, t0, eqd, **flare_params):
     """Return a lightcurve for a single flare normalized to quiescent flux."""
-    values = _kw_or_default(kws, ['boxcar_width_function', 'decay_boxcar_ratio'])
+    values = _kw_or_default(flare_params, ['boxcar_width_function', 'decay_boxcar_ratio'])
     boxcar_width_function, decay_boxcar_ratio = values
 
     boxcar_width = boxcar_width_function(eqd)
@@ -150,21 +117,50 @@ def flare_lightcurve(tbins, t0, eqd, **kws):
     return y
 
 
-def flare_series_lightcurve(tbins, **kws):
+def flare_rate(**flare_params):
+    values = _kw_or_default(flare_params, ['eqd_min', 'eqd_max', 'ks_rate', 'cumulative_index'])
+    eqd_min, eqd_max, ks_rate, cumulative_index = values
+    [_check_unit(flare_rate, v, 's') for v in [eqd_min, eqd_max, ks_rate]]
 
-    time_span = tbins[-1] - tbins[0]
-    tflares, eqds = flare_series(time_span, **kws)
+    if eqd_min <= 0:
+        raise ValueError('Flare rate diverges at eqd_min == 0. Only eqd_min > 0 makes sense.')
+    rate = ks_rate * ((eqd_min/u.ks)**-cumulative_index - (eqd_max/u.ks)**-cumulative_index)
+    return rate.to('d-1')
 
 
-    lightcurves = [flare_lightcurve(tbins, t, e, **kws) for t, e in zip(tflares, eqds)]
-    lightcurves.append(np.zeros(len(tbins)-1))
-    return np.sum(lightcurves, 0)
+def flare_series(time_span, **flare_params):
+    values = _kw_or_default(flare_params, ['eqd_min', 'eqd_max', 'ks_rate', 'cumulative_index'])
+    eqd_min, eqd_max, ks_rate, cumulative_index = values
+    [_check_unit(flare_rate, v, 's') for v in [eqd_min, eqd_max, ks_rate]]
 
+    # get the expected flare rate
+    rate = flare_rate(**flare_params)
 
+    # draw flares at that rate
+    tunit = time_span.unit
+    rate = rate.to(tunit**-1).value
+    time_span = time_span.value
+    t_flare = shot_times(rate, time_span) * tunit
+    n = len(t_flare)
+
+    # draw energies for those flares
+    eqd_min, eqd_max = [x.to(tunit).value for x in [eqd_min, eqd_max]]
+    eqd = power_rv(eqd_min, eqd_max, cumulative_index, n) * tunit
+
+    return t_flare, eqd
 
 
 def fiducial_flare_cube(wbins, SiIVenergy, timescale):
     pass
+def flare_series_lightcurve(tbins, **flare_params):
+
+    time_span = tbins[-1] - tbins[0]
+    tflares, eqds = flare_series(time_span, **flare_params)
+
+
+    lightcurves = [flare_lightcurve(tbins, t, e, **flare_params) for t, e in zip(tflares, eqds)]
+    lightcurves.append(np.zeros(len(tbins)-1))
+    return np.sum(lightcurves, 0)
 
 
 def flare_spectrum(wbins, SiIVenergy):
