@@ -24,22 +24,6 @@ flare_defaults = dict(eqd_min = 100.*u.s,
                       cumulative_index = 0.7,
                       boxcar_width_function = boxcar_width_function_default,
                       decay_boxcar_ratio = 1./2.)
-star_distances = {'gj1214': 14.55,
-                 'gj176': 9.27,
-                 'gj436': 10.13,
-                 'gj581': 6.21,
-                 'gj667c': 6.8,
-                 'gj832': 4.95,
-                 'gj876': 4.69,
-                 'hd103095': 9.092,
-                 'hd40307': 13.0,
-                 'hd85512': 11.16,
-                 'hd97658': 21.11,
-                 'v-eps-eri': 3.22,
-                 'gj551': 1.302}
-_bandwidth = 100*u.km/u.s
-_line_centers_SiIV = [1393.76, 1402.77]
-band_SiIV = []
 
 
 def _kw_or_default(kws, keys):
@@ -184,30 +168,6 @@ def fiducial_flare_spectrum(wbins, SiIVenergy):
     return spec
 
 
-def read_MUSCLES_spectrum(path, instellation=None, distance=None):
-    if not (instellation is None or distance in None):
-        raise ValueError('Can specify an instellation or a distance, but not both.')
-
-    spec = table.Table.read(path)
-    wbins = np.append(spec['WAVELENGTH0'], spec['WAVELENGTH1'][-1]) * spec['WAVELENGTH0'].unit
-
-    # get flux, scaling as desired
-    if instellation is None and distance is None:
-        flux = spec['FLUX'].quantity
-    elif instellation is not None:
-        bolo = spec['BOLOFLUX']
-        flux = bolo.data * u.Unit(bolo.unit.to_string()) * instellation # units clooged because of some bug making
-        # boloflux column show up with unrecognized unit
-        flux = flux.to('erg s-1 cm-2 AA-1')
-    elif distance is not None:
-        star = fits.getval(path, 'targname')
-        dstar = star_distances[star.lower()] * u.pc
-        scale = (dstar/distance)**2
-        scale = scale.to('').value
-        flux = spec['FLUX'].quantity*scale
-
-    spec = Spectrum(wbins, flux, yname=['flux, f'], notes=['MUSCLES spectrum read from {}'.format(path)])
-    return spec
 
 
 def fiducial_flare_cube(wbins, SiIVenergy, timescale):
