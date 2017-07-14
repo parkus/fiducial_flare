@@ -1,18 +1,21 @@
 from astropy import table, constants as const, units as u
 import numpy as np
-import copy
-from astropy.io import fits
+import os
 
-energy_budget_tbl = table.Table.read('relative_energy_budget.ecsv', format='ascii.ecsv')
-eb_bins = np.append(energy_budget_tbl['w0'], energy_budget_tbl['w1'][-1])
-eb_density = energy_budget_tbl['Edensity']
+_mfb_path = os.path.join(os.path.dirname(__file__), 'relative_energy_budget.ecsv')
+muscles_flare_budget = table.Table.read(_mfb_path, format='ascii.ecsv')
+muscles_flare_budget = muscles_flare_budget.filled(0)
+_mfb = muscles_flare_budget
+_eb_bins = np.append(_mfb['w0'], _mfb['w1'][-1]) * _mfb['w0'].unit
+_eb_density = _mfb['Edensity'].quantity
+fuv = [912., 1700.] * u.AA
+nuv = [1700., 3200.] * u.AA
 
 # Abbbreviations:
 # eqd = equivalent duration
 # ks = 1000 s (obvious perhaps :), but not a common unit)
 
-BBfrac_hawley03 = 160
-proxy_lines = {'o6':'n5', 'al2':'c2', 'mg2':'o1'}
+
 @u.quantity_input(eqd=u.s)
 def boxcar_width_function_default(eqd):
     eqd_s = eqd.to('s').value
@@ -22,7 +25,9 @@ flare_defaults = dict(eqd_min = 100.*u.s,
                       ks_rate = 5.5/u.d,
                       cumulative_index = 0.7,
                       boxcar_width_function = boxcar_width_function_default,
-                      decay_boxcar_ratio = 1./2.)
+                      decay_boxcar_ratio = 1./2.,
+                      BB_SiIV_Eratio=160, # Hawley et al. 2003
+                      T_BB = 9000*u.K) # Hawley et al. 2003
 
 
 def _kw_or_default(kws, keys):
@@ -161,8 +166,33 @@ def flare_series_lightcurve(tbins, **flare_params):
     return np.sum(lightcurves, 0)
 
 
-def flare_spectrum(wbins, SiIVenergy):
-    return rebin(wbins, eb_bins, eb_density)*SiIVenergy
+def flare_spectrum(wbins, SiIVenergy, **flare_params):
+    BBratio, T = _kw_or_default(flare_params, ['BB_SiIV_Eratio', 'T_BB'])
+
+    # get energy density from muscles data
+    eb_bins = _eb_bins.to(wbins.unit)
+    FUV_and_lines = rebin(wbins.value, eb_bins.value, _eb_density.value) * _eb_density.unit * SiIVenergy
+
+    # get a blackbody and normalize to Hawley value
+    red = (wbins[1:] > fuv[1])
+    BBbins = np.insert(wbins[1:][red], 0, fuv[1])
+    BB = blackbody(BBbins, T, bolometric=BBratio*SiIVenergy)
+
+    result = FUV_and_lines
+    result[red] += BB
+    return result
+
+
+@u.quantity_input(wbins=u.AA, T=u.K)
+def blackbody(wbins, T, bolometric=None):
+    w = (wbins[:-1] + wbins[1:])/2.
+    f = np.pi * 2 * const.h * const.c ** 2 / w ** 5 / (np.exp(const.h * const.c / const.k_B / T / w) - 1)
+    if bolometric is None:
+        return f.to('erg s-1 cm-2 AA-1')
+    else:
+        fbolo = const.sigma_sb*T**4
+        fnorm = (f/fbolo).to(1/wbins.unit)
+        return fnorm*bolometric
 
 
 def flare_series_spectra(wbins, tbins, SiIV_quiescent, **flare_params):
@@ -172,24 +202,18 @@ def flare_series_spectra(wbins, tbins, SiIV_quiescent, **flare_params):
 
 
 def rebin(bins_new, bins_old, y):
+    if any(isinstance(x, u.Quantity) for x in [bins_new, bins_old, y]):
+        raise ValueError('No astropy Quantity input for this function, please.')
     if np.any(bins_old[1:] <= bins_old[:-1]) or np.any(bins_new[1:] <= bins_new[:-1]):
         raise ValueError('Old and new bin edges must be monotonically increasing.')
 
     # compute cumulative integral of binned data
     areas = y*np.diff(bins_old)
-    Iold = np.sum(areas) # for accuracy check later
     I = np.cumsum(areas)
     I = np.insert(I, 0, 0)
 
     # compute average value in new bins
-    Iedges = np.interp(bins_new, bins_old, I, left=0, right=0)
+    Iedges = np.interp(bins_new, bins_old, I)
     y_new = np.diff(Iedges)/np.diff(bins_new)
-
-    # check that integral using new values is close to the one previous
-    Inew = np.sum(np.diff(bins_new)*y_new)
-    if not np.isclose(Iold, Inew):
-        raise ValueError('Inaccurate result, probably because of very fine binning producing accumulated truncation '
-                         'errors in the cumulative sums used in this algorithm. Use a more accurate method (e.g. '
-                         'github.com/parkus/crebin)')
 
     return y_new
