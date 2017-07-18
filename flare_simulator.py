@@ -27,7 +27,9 @@ flare_defaults = dict(eqd_min = 100.*u.s,
                       boxcar_width_function = boxcar_width_function_default,
                       decay_boxcar_ratio = 1./2.,
                       BB_SiIV_Eratio=160, # Hawley et al. 2003
-                      T_BB = 9000*u.K) # Hawley et al. 2003
+                      T_BB = 9000*u.K, # Hawley et al. 2003
+                      SiIV_quiescent=0.1*u.Unit('erg s-1 cm-2')) # for GJ 832 with bolometric flux equal to Earth
+# insolation
 
 
 def _kw_or_default(kws, keys):
@@ -166,17 +168,17 @@ def flare_series_lightcurve(tbins, **flare_params):
     return np.sum(lightcurves, 0)
 
 
-def flare_spectrum(wbins, SiIVenergy, **flare_params):
+def flare_spectrum(wbins, SiIV, **flare_params):
     BBratio, T = _kw_or_default(flare_params, ['BB_SiIV_Eratio', 'T_BB'])
 
     # get energy density from muscles data
     eb_bins = _eb_bins.to(wbins.unit)
-    FUV_and_lines = rebin(wbins.value, eb_bins.value, _eb_density.value) * _eb_density.unit * SiIVenergy
+    FUV_and_lines = rebin(wbins.value, eb_bins.value, _eb_density.value) * _eb_density.unit * SiIV
 
     # get a blackbody and normalize to Hawley value
     red = (wbins[1:] > fuv[1])
     BBbins = np.insert(wbins[1:][red], 0, fuv[1])
-    BB = blackbody(BBbins, T, bolometric=BBratio*SiIVenergy)
+    BB = blackbody(BBbins, T, bolometric=BBratio * SiIV)
 
     result = FUV_and_lines
     result[red] += BB
@@ -195,9 +197,10 @@ def blackbody(wbins, T, bolometric=None):
         return fnorm*bolometric
 
 
-def flare_series_spectra(wbins, tbins, SiIV_quiescent, **flare_params):
+def flare_series_spectra(wbins, tbins, **flare_params):
+    SiIVq = _kw_or_default(flare_params, ['SiIV_quiescent'])
     lightcurve = flare_series_lightcurve(tbins, **flare_params)
-    spectrum = flare_spectrum(wbins, SiIV_quiescent)
+    spectrum = flare_spectrum(wbins, SiIVq)
     return np.outer(lightcurve, spectrum)
 
 
