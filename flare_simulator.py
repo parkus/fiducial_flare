@@ -17,17 +17,17 @@ nuv = [1700., 3200.] * u.AA
 
 
 @u.quantity_input(eqd=u.s)
-def boxcar_width_function_default(eqd):
+def boxcar_height_function_default(eqd):
     eqd_s = eqd.to('s').value
-    return 7.3*eqd_s**0.19 * u.s
+    return 0.34*eqd_s**0.57
 flare_defaults = dict(eqd_min = 100.*u.s,
                       eqd_max = 1e6*u.s,
                       ks_rate = 5.5/u.d,
                       cumulative_index = 0.7,
-                      boxcar_width_function = boxcar_width_function_default,
+                      boxcar_height_function = boxcar_height_function_default,
                       decay_boxcar_ratio = 1./2.,
-                      BB_SiIV_Eratio=160, # Hawley et al. 2003
-                      T_BB = 9000*u.K, # Hawley et al. 2003
+                      BB_SiIV_Eratio=160,  # Hawley et al. 2003
+                      T_BB = 9000*u.K,  # Hawley et al. 2003
                       SiIV_quiescent=0.1*u.Unit('erg s-1 cm-2')) # for GJ 832 with bolometric flux equal to Earth
 # insolation
 
@@ -78,14 +78,14 @@ def shot_times(rate, time_span):
         return tshot[tshot < time_span]
 
 
-def boxcar_decay(tbins, t0, area_box, width_box, area_decay):
-    if any(isinstance(x, u.Quantity) for x in [tbins, t0, area_box, width_box, area_decay]):
+def boxcar_decay(tbins, t0, area_box, height_box, area_decay):
+    if any(isinstance(x, u.Quantity) for x in [tbins, t0, area_box, height_box, area_decay]):
         raise ValueError('No astropy Quantity input for this function, please.')
 
     # make coarse t,y for boxcar function
+    width_box = area_box/height_box
     tbox = [tbins[0]] if tbins[0] < t0 else []
     tbox.extend([t0, t0 + width_box])
-    height_box = area_box/width_box
     ybox = [0, height_box] if tbins[0] < t0 else [height_box]
 
     # make precise array for decay
@@ -105,22 +105,17 @@ def boxcar_decay(tbins, t0, area_box, width_box, area_decay):
 
 def flare_lightcurve(tbins, t0, eqd, **flare_params):
     """Return a lightcurve for a single flare normalized to quiescent flux."""
-    values = _kw_or_default(flare_params, ['boxcar_width_function', 'decay_boxcar_ratio'])
-    boxcar_width_function, decay_boxcar_ratio = values
+    values = _kw_or_default(flare_params, ['boxcar_height_function', 'decay_boxcar_ratio'])
+    boxcar_height_function, decay_boxcar_ratio = values
 
-    boxcar_width = boxcar_width_function(eqd)
-    try:
-        boxcar_width.to('s')
-    except u.UnitConversionError:
-        raise ValueError('boxcar_width_function must return an astropy Quantity with units of time.')
+    boxcar_height = boxcar_height_function(eqd)
     boxcar_area = eqd/(1 + decay_boxcar_ratio)
     decay_area = boxcar_area * decay_boxcar_ratio
 
     # make units uniform
     tunit = tbins.unit
-    tbins, t0, eqd, boxcar_width, boxcar_area, decay_area = [x.to(tunit).value for x in
-                                                             [tbins, t0, eqd, boxcar_width, boxcar_area, decay_area]]
-    y = boxcar_decay(tbins, t0, boxcar_area, boxcar_width, decay_area)
+    tbins, t0, eqd, boxcar_area, decay_area = [x.to(tunit).value for x in [tbins, t0, eqd, boxcar_area, decay_area]]
+    y = boxcar_decay(tbins, t0, boxcar_area, boxcar_height, decay_area)
     return y
 
 
