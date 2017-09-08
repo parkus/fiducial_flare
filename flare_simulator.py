@@ -122,7 +122,8 @@ def flare_lightcurve(tbins, t0, eqd, **flare_params):
 def flare_rate(**flare_params):
     values = _kw_or_default(flare_params, ['eqd_min', 'eqd_max', 'ks_rate', 'cumulative_index'])
     eqd_min, eqd_max, ks_rate, cumulative_index = values
-    [_check_unit(flare_rate, v, 's') for v in [eqd_min, eqd_max, ks_rate]]
+    _check_unit(flare_rate, ks_rate, 's-1')
+    [_check_unit(flare_rate, v, 's') for v in [eqd_min, eqd_max]]
 
     if eqd_min <= 0:
         raise ValueError('Flare rate diverges at eqd_min == 0. Only eqd_min > 0 makes sense.')
@@ -131,9 +132,9 @@ def flare_rate(**flare_params):
 
 
 def flare_series(time_span, **flare_params):
-    values = _kw_or_default(flare_params, ['eqd_min', 'eqd_max', 'ks_rate', 'cumulative_index'])
-    eqd_min, eqd_max, ks_rate, cumulative_index = values
-    [_check_unit(flare_rate, v, 's') for v in [eqd_min, eqd_max, ks_rate]]
+    values = _kw_or_default(flare_params, ['eqd_min', 'eqd_max', 'cumulative_index'])
+    eqd_min, eqd_max, cumulative_index = values
+    [_check_unit(flare_series, v, 's') for v in [eqd_min, eqd_max]]
 
     # get the expected flare rate
     rate = flare_rate(**flare_params)
@@ -152,7 +153,7 @@ def flare_series(time_span, **flare_params):
     return t_flare, eqd
 
 
-def flare_series_lightcurve(tbins, **flare_params):
+def flare_series_lightcurve(tbins, return_flares=False, **flare_params):
 
     time_span = tbins[-1] - tbins[0]
     tflares, eqds = flare_series(time_span, **flare_params)
@@ -160,7 +161,11 @@ def flare_series_lightcurve(tbins, **flare_params):
 
     lightcurves = [flare_lightcurve(tbins, t, e, **flare_params) for t, e in zip(tflares, eqds)]
     lightcurves.append(np.zeros(len(tbins)-1))
-    return np.sum(lightcurves, 0)
+    y = np.sum(lightcurves, 0)
+    if return_flares:
+        return y, (tflares, eqds)
+    else:
+        return y
 
 
 def flare_spectrum(wbins, SiIV, **flare_params):
@@ -192,11 +197,18 @@ def blackbody(wbins, T, bolometric=None):
         return fnorm*bolometric
 
 
+def flare_spectra(wbins, tbins, t0, eqd, **flare_params):
+    SiIVq, = _kw_or_default(flare_params, ['SiIV_quiescent'])
+    lightcurve = flare_lightcurve(tbins, t0, eqd, **flare_params)
+    spectrum = flare_spectrum(wbins, SiIVq, **flare_params)
+    return np.outer(lightcurve, spectrum.value)*spectrum.unit
+
+
 def flare_series_spectra(wbins, tbins, **flare_params):
-    SiIVq = _kw_or_default(flare_params, ['SiIV_quiescent'])
+    SiIVq, = _kw_or_default(flare_params, ['SiIV_quiescent'])
     lightcurve = flare_series_lightcurve(tbins, **flare_params)
-    spectrum = flare_spectrum(wbins, SiIVq)
-    return np.outer(lightcurve, spectrum)
+    spectrum = flare_spectrum(wbins, SiIVq, **flare_params)
+    return np.outer(lightcurve, spectrum.value)*spectrum.unit
 
 
 def rebin(bins_new, bins_old, y):
