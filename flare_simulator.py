@@ -10,6 +10,7 @@ _eb_bins = np.append(_mfb['w0'], _mfb['w1'][-1]) * _mfb['w0'].unit
 _eb_density = _mfb['Edensity'].quantity
 fuv = [912., 1700.] * u.AA
 nuv = [1700., 3200.] * u.AA
+version = '0.1'
 
 # Abbbreviations:
 # eqd = equivalent duration
