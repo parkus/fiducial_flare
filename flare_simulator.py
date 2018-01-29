@@ -20,10 +20,10 @@ version = '0.1'
 @u.quantity_input(eqd=u.s)
 def boxcar_height_function_default(eqd):
     eqd_s = eqd.to('s').value
-    return 0.34*eqd_s**0.57
+    return 0.3*eqd_s**0.6
 flare_defaults = dict(eqd_min = 100.*u.s,
                       eqd_max = 1e6*u.s,
-                      ks_rate = 5.5/u.d,
+                      ks_rate = 5.5/u.d, # max likelihood value of rate at the rounded value of a
                       cumulative_index = 0.7,
                       boxcar_height_function = boxcar_height_function_default,
                       decay_boxcar_ratio = 1./2.,
