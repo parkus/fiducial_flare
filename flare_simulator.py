@@ -99,25 +99,56 @@ def boxcar_decay(tbins, t0, area_box, height_box, area_decay):
     if any(isinstance(x, u.Quantity) for x in [tbins, t0, area_box, height_box, area_decay]):
         raise ValueError('No astropy Quantity input for this function, please.')
 
-    # make coarse t,y for boxcar function
-    width_box = area_box/height_box
-    tbox = [tbins[0]] if tbins[0] < t0 else []
-    tbox.extend([t0, t0 + width_box])
-    ybox = [0, height_box] if tbins[0] < t0 else [height_box]
+    # this is going to have to be ugly for it to be fast, I think
 
-    # make precise array for decay
+    # standardize t0, area_box, height_box, and area_decay for array input
+    t0, area_box, height_box, area_decay = [np.reshape(a, [-1]) for a in [t0, area_box, height_box, area_decay]]
+
+    # compute end of box, start of decay
+    t1 = t0 + area_box/height_box
+
+    # correct for portions hanging over ends of tbins
+    t0[t0 < tbins[0]] = tbins[0]
+    t1[t1 > tbins[-1]] = tbins[-1]
+
+    # initialize y array
+    y = np.zeros((len(t0), len(tbins)-1))
+    i_rows = np.arange(y.shape[0])
+
+    # add starting portion of box to first bin that is only partially covered by it
+    i0 = np.searchsorted(tbins, t0, side='right')
+    frac = (tbins[i0] - t0)/(tbins[i0] - tbins[i0-1])
+    y[i_rows, i0-1] += frac*height_box
+
+    # add box to bins fully covered by it
+    inbox = (tbins[None, :-1] > t0[:, None]) & (tbins[None, 1:] < t1[:, None])
+    y += height_box[:,None]*inbox
+
+    # add ending fraction of box to last bin that is partially covered by it
+    i1 = np.searchsorted(tbins, t1, side='left')
+    frac = (t1 - tbins[i1-1])/(tbins[i1] - tbins[i1-1])
+    y[i_rows, i1-1] += frac*height_box
+
+    # deal with any cases where the box was entirely within a bin
+    j = i0 == i1
+    y[i_rows[j], i0[j]-1] = area_box[j]/(tbins[i0+1][j] - tbins[i0][j])
+
+    # add decay
+    # compute cumulative decay integral at all time points
     amp_decay = height_box
-    tau_decay = area_decay/amp_decay
-    t0_decay = t0 + width_box
-    tdecay = tbins[tbins > t0_decay]
-    tdecay = np.insert(tdecay, 0, t0_decay)
-    Idecay = -amp_decay*tau_decay*np.exp(-(tdecay - t0_decay)/tau_decay)
-    ydecay = np.diff(Idecay)/np.diff(tdecay)
+    tau_decay = area_decay / amp_decay
+    Idecay = -amp_decay[:,None]*tau_decay[:,None]*np.exp(-(tbins[None,:] - t1[:,None])/tau_decay[:,None])
+    ydecay = np.diff(Idecay, 1)/np.diff(tbins)
+    keep = tbins[:-1] > t1[:, None]
+    y[keep] += ydecay[keep]
 
-    # bin to input stipulations
-    t = np.concatenate([tbox[:-1], tdecay])
-    y = np.concatenate([ybox, ydecay])
-    return rebin(tbins, t, y)
+    # add fractional piece of exponential
+    i1 = np.searchsorted(tbins, t1, side='right')
+    Idecay1 = -amp_decay*tau_decay
+    ydecay1 = (Idecay[i_rows, i1] - Idecay1)/(tbins[i1] - tbins[i1-1])
+    y[i_rows, i1-1] += ydecay1
+
+    return np.sum(y, 0)
 
 
 def flare_lightcurve(tbins, t0, eqd, **flare_params):
@@ -175,10 +206,7 @@ def flare_series_lightcurve(tbins, return_flares=False, **flare_params):
     time_span = tbins[-1] - tbins[0]
     tflares, eqds = flare_series(time_span, **flare_params)
 
-
-    lightcurves = [flare_lightcurve(tbins, t, e, **flare_params) for t, e in zip(tflares, eqds)]
-    lightcurves.append(np.zeros(len(tbins)-1))
-    y = np.sum(lightcurves, 0)
+    y = flare_lightcurve(tbins, tflares, eqds, **flare_params)
     if return_flares:
         return y, (tflares, eqds)
     else:
