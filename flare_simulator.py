@@ -9,7 +9,7 @@ default_flarespec = table.Table.read(default_flarespec_path, format='ascii.ecsv'
 default_flarespec = default_flarespec.filled(0)
 fuv = [912., 1700.] * u.AA
 nuv = [1700., 3200.] * u.AA
-version = '0.1'
+version = '0.2'
 
 # Abbbreviations:
 # eqd = equivalent duration
@@ -48,6 +48,22 @@ def _check_unit(func, var, unit):
     except AttributeError, u.UnitConversionError:
         raise('Variable {} supplied to the {} must be an astropy.Units.Quantity object with units convertable to {}'
               ''.format(var.__name__, func.__name__, unit))
+
+
+def _integrate_spec_table(spec_table):
+    return np.sum((spec_table['w1'] - spec_table['w0']) * spec_table['Edensity'])
+
+
+def filter_to_SiIV_energy(filter_wave, filter_response, energy, **flare_params):
+    # get filter-convolved fraction of flare energy relative to Si IV
+    w_sample = np.linspace(filter_wave[0], filter_wave[-1], len(filter_wave)*100)
+    flux = flare_spectrum(w_sample, 1.0, **flare_params)
+    w_mid = (w_sample[1:] + w_sample[:-1])/2.0
+    response = np.interp(w_mid, filter_wave, filter_response)
+    filter_fraction = np.trapz(response*flux, w_mid)
+
+    # then just invert to get the energy in Si IV given the filter energy
+    return energy*filter_fraction
 
 
 def power_rv(min, max, cumulative_index, n):
