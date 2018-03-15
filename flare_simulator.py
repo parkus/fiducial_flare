@@ -2,12 +2,9 @@ from astropy import table, constants as const, units as u
 import numpy as np
 import os
 
-_mfb_path = os.path.join(os.path.dirname(__file__), 'relative_energy_budget.ecsv')
-muscles_flare_budget = table.Table.read(_mfb_path, format='ascii.ecsv')
-muscles_flare_budget = muscles_flare_budget.filled(0)
-_mfb = muscles_flare_budget
-_eb_bins = np.append(_mfb['w0'], _mfb['w1'][-1]) * _mfb['w0'].unit
-_eb_density = _mfb['Edensity'].quantity
+default_flarespec_path = os.path.join(os.path.dirname(__file__), 'relative_energy_budget.ecsv')
+default_flarespec = table.Table.read(default_flarespec_path, format='ascii.ecsv')
+default_flarespec = default_flarespec.filled(0)
 fuv = [912., 1700.] * u.AA
 nuv = [1700., 3200.] * u.AA
 version = '0.1'
@@ -23,13 +20,14 @@ def boxcar_height_function_default(eqd):
     return 0.3*eqd_s**0.6
 flare_defaults = dict(eqd_min = 100.*u.s,
                       eqd_max = 1e6*u.s,
-                      ks_rate = 5.5/u.d, # max likelihood value of rate at the rounded value of a
+                      ks_rate = 5.5/u.d, # max likelihood value of rate of 1 ks flares at the rounded value of a
                       cumulative_index = 0.7,
                       boxcar_height_function = boxcar_height_function_default,
                       decay_boxcar_ratio = 1./2.,
                       BB_SiIV_Eratio=160,  # Hawley et al. 2003
                       T_BB = 9000*u.K,  # Hawley et al. 2003
-                      SiIV_quiescent=0.1*u.Unit('erg s-1 cm-2')) # for GJ 832 with bolometric flux equal to Earth
+                      SiIV_quiescent=0.1*u.Unit('erg s-1 cm-2'), # for GJ 832 with bolometric flux equal to Earth
+                      SiIV_normed_flare_spec=default_flarespec)
 # insolation
 
 
@@ -170,13 +168,15 @@ def flare_series_lightcurve(tbins, return_flares=False, **flare_params):
 
 
 def flare_spectrum(wbins, SiIV, **flare_params):
-    BBratio, T = _kw_or_default(flare_params, ['BB_SiIV_Eratio', 'T_BB'])
+    BBratio, T, flarespec = _kw_or_default(flare_params, ['BB_SiIV_Eratio', 'T_BB', 'SiIV_normed_flare_spec'])
 
     # get energy density from muscles data
-    eb_bins = _eb_bins.to(wbins.unit)
-    FUV_and_lines = rebin(wbins.value, eb_bins.value, _eb_density.value) * _eb_density.unit * SiIV
+    fs_bins = np.append(flarespec['w0'], flarespec['w1'][-1]) * flarespec['w0'].unit
+    fs_density = flarespec['Edensity'].quantity
+    fs_bins = fs_bins.to(wbins.unit)
+    FUV_and_lines = rebin(wbins.value, fs_bins.value, fs_density.value) * fs_density.unit * SiIV
 
-    # get a blackbody and normalize to Hawley value
+    # get a blackbody and normalize to Hawley or user-chosen value
     red = (wbins[1:] > fuv[1])
     BBbins = np.insert(wbins[1:][red], 0, fuv[1])
     BB = blackbody(BBbins, T, bolometric=BBratio * SiIV)
