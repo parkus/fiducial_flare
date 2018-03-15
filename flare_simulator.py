@@ -1,6 +1,8 @@
 from astropy import table, constants as const, units as u
 import numpy as np
 import os
+import mpmath
+h, c, k_B = const.h, const.c, const.k_B
 
 default_flarespec_path = os.path.join(os.path.dirname(__file__), 'relative_energy_budget.ecsv')
 default_flarespec = table.Table.read(default_flarespec_path, format='ascii.ecsv')
@@ -179,23 +181,48 @@ def flare_spectrum(wbins, SiIV, **flare_params):
     # get a blackbody and normalize to Hawley or user-chosen value
     red = (wbins[1:] > fuv[1])
     BBbins = np.insert(wbins[1:][red], 0, fuv[1])
-    BB = blackbody(BBbins, T, bolometric=BBratio * SiIV)
+    BB = blackbody_binned(BBbins, T, bolometric=BBratio * SiIV)
 
     result = FUV_and_lines
     result[red] += BB
     return result
 
 
+_Li = mpmath.fp.polylog
+def _P3(x):
+    e = np.exp(-x)
+    return _Li(4, e) + x*_Li(3, e) + x**2/2*_Li(2, e) + x**3/6*_Li(1, e)
+_P3 = np.vectorize(_P3)
+
+
+def _blackbody_partial_integral(w, T):
+    x = (h*c/w/k_B/T).to('').value
+    I = 12 * np.pi * (k_B*T)**4 / c**2 / h**3 * _P3(x)
+    return I.to('erg s-1 cm-2')
+
+
 @u.quantity_input(wbins=u.AA, T=u.K)
-def blackbody(wbins, T, bolometric=None):
-    w = (wbins[:-1] + wbins[1:])/2.
-    f = np.pi * 2 * const.h * const.c ** 2 / w ** 5 / (np.exp(const.h * const.c / const.k_B / T / w) - 1)
+def blackbody_binned(wbins, T, bolometric=None):
+    F = np.diff(_blackbody_partial_integral(wbins, T))
+    f = F / np.diff(wbins)
     if bolometric is None:
         return f.to('erg s-1 cm-2 AA-1')
     else:
         fbolo = const.sigma_sb*T**4
         fnorm = (f/fbolo).to(1/wbins.unit)
         return fnorm*bolometric
+
+
+@u.quantity_input(wbins=u.AA, T=u.K)
+def blackbody_points(w, T, bolometric=None):
+    f = np.pi * 2 * const.h * const.c ** 2 / w ** 5 / (np.exp(const.h * const.c / const.k_B / T / w) - 1)
+    if bolometric is None:
+        return f.to('erg s-1 cm-2 AA-1')
+    else:
+        fbolo = const.sigma_sb*T**4
+        fnorm = (f/fbolo).to(1/w.unit)
+        return fnorm*bolometric
+# TODO: after definiing function, I could dynamically add flare parameters it uses by modifying func.__doc__,
 
 
 def flare_spectra(wbins, tbins, t0, eqd, **flare_params):
