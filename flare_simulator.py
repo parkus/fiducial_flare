@@ -63,7 +63,7 @@ def filter_to_SiIV_energy(filter_wave, filter_response, energy, **flare_params):
     filter_fraction = np.trapz(response*flux, w_mid)
 
     # then just invert to get the energy in Si IV given the filter energy
-    return energy*filter_fraction
+    return energy/filter_fraction
 
 
 def power_rv(min, max, cumulative_index, n):
