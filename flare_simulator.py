@@ -32,6 +32,7 @@ flare_defaults = dict(eqd_min = 100.*u.s,
                       decay_boxcar_ratio = 1./2.,
                       BB_SiIV_Eratio=160,  # Hawley et al. 2003
                       T_BB = 9000*u.K,  # Hawley et al. 2003
+                      clip_BB = True,
                       SiIV_quiescent=0.1*u.Unit('erg s-1 cm-2'), # for GJ 832 with bolometric flux equal to Earth
                       SiIV_normed_flare_spec=default_flarespec)
 #endregion
@@ -69,61 +70,81 @@ def _integrate_spec_table(spec_table):
 # about that. However, pulling up help on each function should work well, and, like I said, it's more consistent.
 _fd = flare_defaults
 _flare_params_doc = "flare_params : dictionary\n" \
-                    "    Parameters of the flare model. If a parameter is not sepcified, the default is taken from the\n" \
-                    "    flare_simulator.flare_defaults dictionary. Parameters relevant to this function are:"
+                    "        Parameters of the flare model. If a parameter is not sepcified, \n" \
+                    "        the default is taken from the flare_simulator.flare_defaults \n" \
+                    "        dictionary. Parameters relevant to this function are:"
 _param_doc_dic = dict(eqd_min = "eqd_min : astropy quantity, units of time\n"
-                                "    Minimum flare equivalent duration to be considered.Default is {}."
+                                "    Minimum flare equivalent duration to be considered.\n"
+                                "    Default is {}."
                                 "".format(_fd['eqd_min']),
                       eqd_max = "eqd_max : astropy quantity, units of time\n"
-                                "    Maxium flare equivalent duration to be considered. Default is {}."
+                                "    Maxium flare equivalent duration to be considered. \n"
+                                "    Default is {}."
                                 "".format(_fd['eqd_max']),
                       ks_rate = "ks_rate : astropy quantity, units of time-1\n"
-                                "    Rate of Si IV flares with an equivalent duration of 1000 s. Default is {}."
+                                "    Rate of Si IV flares with an equivalent duration of 1000 s. \n"
+                                "    Default is {}."
                                 "".format(_fd['ks_rate']),
                       cumulative_index= "cumulative_index : float\n"
-                                        "    Cumulative index of a power-law relating the frequency of flares greater than\n"
-                                        "    a given energy to that energy. Default is {}.".format(_fd['cumulative_index']),
+                                        "    Cumulative index of a power-law relating the frequency of flares\n"
+                                        "    greater than a given energy to that energy. Default is {}."
+                                        "".format(_fd['cumulative_index']),
                       boxcar_height_function = "boxcar_height_function : function\n"
-                                               "    Function relating the peak flare flux (height of the boxcar portion\n"
-                                               "    of the boxcar-decay model) to the equivalent duration of the flare.\n"
-                                               "    The function must accept an equivalent duration as an astropy quantity\n"
-                                               "    with units of time as its only input. Default is the function \n"
-                                               "    height = 0.3 * equivalent_duration**0.6",
+                                               "    Function relating the peak flare flux (height of the boxcar \n"
+                                               "    portion of the boxcar-decay model) to the equivalent duration \n"
+                                               "    of the flare. The function must accept an equivalent duration \n"
+                                               "    as an astropy quantity with units of time as its only input. \n"
+                                               "    Default is the function height = 0.3 * equivalent_duration**0.6",
                       decay_boxcar_ratio = "decay_boxcar_ratio : float\n"
-                                           "    Ratio between the the amount of flare energy contained in the boxcar portion\n"
-                                           "    of the boxcar-decay model and the decay portion. This actually determines\n"
-                                           "    the time-constant of the decay. I'm not sure if I actually like that...\n"
-                                           "    Default is {}.".format(_fd['decay_boxcar_ratio']),
+                                           "    Ratio between the the amount of flare energy contained in \n"
+                                           "    the boxcar portion of the boxcar-decay model and the decay \n"
+                                           "    portion. This actually determines the time-constant of the \n"
+                                           "    decay. I'm not sure if I actually like that... Default is {}."
+                                           "".format(_fd['decay_boxcar_ratio']),
                       BB_SiIV_Eratio = "BB_SiIV_Eratio : float\n"
                                        "    Ratio of the blackbody energy to the Si IV energy of the flare.\n"
                                        "    Default is {}.".format(_fd['BB_SiIV_Eratio']),
                       T_BB = "T_BB : astropy quantity, units of temperature\n"
-                             "    Temperature of the flare blackbody continuum. Default is {}.".format(_fd['T_BB']),
+                             "    Temperature of the flare blackbody continuum. \n"
+                             "    Default is {}.".format(_fd['T_BB']),
                       SiIV_quiescent = "SiIV_quiescent : astropy quantity, units of energy time-1 length-2\n"
-                                       "    Quiescent flux of the star in the Si IV 1393,1402 AA lines. Default is representative\n"
-                                       "    of an inactive M dwarf at the distance where the bolometric irradiation equals\n"
-                                       "    that of Earth, {}.".format(_fd['SiIV_quiescent']),
+                                       "    Quiescent flux of the star in the Si IV 1393,1402 AA lines. \n"
+                                       "    Default is representative of an inactive M dwarf at the distance \n"
+                                       "    where the bolometric irradiation equals that of Earth,\n"
+                                       "     {}.".format(_fd['SiIV_quiescent']),
                       SiIV_normed_flare_spec = "SiIV_normed_flare_spec : astropy table\n"
-                                               "    Spectral energy budget of the flare (excluding the blackbody) normalized\n"
-                                               "    to the combined flux of the Si IV 1393,1402 AA lines. The energy budget \n"
-                                               "    should be an astropy table with columns of\n"
+                                               "    Spectral energy budget of the flare (excluding the blackbody) \n"
+                                               "    normalized to the combined flux of the Si IV 1393,1402 AA lines. \n"
+                                               "    The energy budget  should be an astropy table with columns of\n"
                                                "        'w0' : start of each spectral bin, units of length\n"
                                                "        'w1' : end of each spectral bin, units of length\n"
-                                               "        'Edensity' : energy emitted by that flare in the spectral bin divided\n" 
-                                               "                     by the width of the bin, units of energy length-1\n"
-                                               "    Default is loaded from the 'relative_energy_budget.ecsv' file.")
+                                               "        'Edensity' : energy emitted by that flare in the spectral\n"
+                                               "                     bin divided by the width of the bin, units of \n"
+                                               "                     energy length-1\n"
+                                               "    Default is loaded from the 'relative_energy_budget.ecsv' file.",
+                      clip_BB = "clip_BB : True|False\n"
+                                "    If True (default), do not include blackbody flux in the FUV range \n"
+                                "    and shortward. This is done because BB flux is presumed to be \n"
+                                "    included in the flare SED at EUV and FUV wavelengths assembled by \n"
+                                "    Loyd+ 2018 that is the default here. However, should be changed to\n"
+                                "    False if, e.g., a hotter or more energetic blackbody is adopted.")
 _tbins_doc = 'tbins : astropy quantity array, units of time\n' \
-             '    Edges of the lightcurve time bins.'
+             '        Edges of the lightcurve time bins.'
 _wbins_doc = 'wbins : astropy quantity array, units of length\n' \
-             '    Edges of the spectral bins.'
+             '        Edges of the spectral bins.'
 _t0_doc = 't0 : astropy quantity, units of time\n' \
-          '    Start time of flare.'
+          '        Start time of flare.'
 _eqd_doc = 'eqd : astropy quantity, units of time\n' \
-           '    Equivalent duration of flare in the Si IV 1393,1402 line ' \
-           '(flare energy divided by star\'s quiescent luminosity in the same band).'
+           '        Equivalent duration of flare in the Si IV 1393,1402 line \n' \
+           '        (flare energy divided by star\'s quiescent luminosity\n' \
+           '        in the same band).'
 
+def add_indent(txt):
+    return "    " + txt.replace('\n', '\n    ')
 def _get_param_string(*keys):
     strings = [_param_doc_dic[key] for key in keys]
+    strings = map(add_indent, strings)
+    strings = map(add_indent, strings)
     return '\n'.join([_flare_params_doc] + strings)
 def _format_doc(func, **kws):
     func.__doc__ = func.__doc__.format(**kws)
@@ -173,8 +194,9 @@ def blackbody_binned(wbins, T, bolometric=None):
     T : astropy quantity, units of temperature
         temperature of blackbody
     bolometric : astropy quantity, units of energy time-1 length-2
-        value of the bolometric blackbody flux by which to normalize the output. A value of None gives the flux at the
-        surface of the emitter.
+        value of the bolometric blackbody flux by which to normalize the
+        output.  A value of None gives the flux at the surface of the
+        emitter.
 
     Returns
     -------
@@ -212,8 +234,9 @@ def blackbody_points(w, T, bolometric=None):
     T : astropy quantity, units of temperature
         temperature of blackbody
     bolometric : astropy quantity, units of energy time-1 length-2
-        value of the bolometric blackbody flux by which to normalize the output. A value of None gives the flux at the
-        surface of the emitter.
+        value of the bolometric blackbody flux by which to normalize the
+        output.  A value of None gives the flux at the surface of the
+        emitter.
 
     Returns
     -------
@@ -245,7 +268,8 @@ def rebin(bins_new, bins_old, y):
     bins_old : array
         Old bin edges.
     y : array
-        Binned values (average of some function like a spectrum across each bin).
+        Binned values (average of some function like a spectrum across
+        each bin).
 
     Returns
     -------
@@ -367,8 +391,10 @@ def boxcar_decay(tbins, t0, area_box, height_box, area_decay):
 
     Notes
     -----
-    This function is a bottleneck when creating a lightcurve from a long series of flares. If this code is to be adapted
-    for quick simulation of years-long series of flares, this is where the speedup needs to happen.
+    This function is a bottleneck when creating a lightcurve from a long
+    series of flares. If this code is to be adapted for quick simulation
+    of years-long series of flares, this is where the speedup needs to
+    happen.
     """
 
     # politely let user know that, in this instance, astropy Quantities are not wanted
@@ -432,119 +458,6 @@ def boxcar_decay(tbins, t0, area_box, height_box, area_decay):
 #endregion
 
 
-#region attempts at better speed at computing a series of boxcar decays
-def _boxcar_decay_test(tbins, t0, area_box, height_box, area_decay):
-
-    te = tbins
-    nbins = len(te) - 1
-
-    flares = np.array([t0, area_box, height_box, area_decay]).T
-    y = np.zeros(nbins)
-    for flare in flares:
-        t0, A, h, Ad = flare
-
-        if t0 > te[-1]:
-            continue
-
-        tau = A/h
-        amp = h*tau
-        t1 = t0 + A/h
-        if t0 < te[0]:
-            t0 = te[0]
-        i = 0
-
-        # advance to first bin containing part of box
-        while te[i+1] < t0 and i < nbins:
-            i += 1
-
-        if te[i] < t1:
-            # if box is completely within bin, spread box over bin
-            if te[i+1] > t1:
-                y[i] += h * (t1 - t0)/(te[i+1] - te[i])
-
-            # else spread partial box over bin and advance
-            else:
-                y[i] += h * (te[i+1] - t0)/(te[i+1] - te[i])
-                i += 1
-
-                # add box flux to bin whole bins until reach bin containing end of box
-                while te[i+1] < t1:
-                    y[i] += h
-                    i += 1
-
-                # spread end of box across last bin
-                y[i] += h * (t1 - te[i])/(te[i+1] - te[i])
-
-            # spread partial start of exponential over bin
-            Ia = 1
-            Ib = np.exp(-(te[i+1] - t1)/tau)
-            y[i] += amp * (Ia - Ib)/(te[i+1] - te[i])
-            i += 1
-        else:
-            Ib = np.exp(-(te[i] - t1)/tau)
-
-        # add exponential to each of the remaining bins
-        while i < nbins:
-            Ia = Ib
-            Ib = np.exp(-(te[i+1]-t1)/tau)
-            y[i] += amp * (Ia - Ib) / (te[i+1] - te[i])
-            i += 1
-
-    return y
-
-
-def _boxcar_decay_test2(tbins, tstart, area_box, height_box, area_decay):
-
-    te = np.array(tbins, dtype=np.double)
-    nbins = len(te) - 1
-    nflares = len(tstart)
-
-    hb = np.array(height_box, dtype=np.double)
-    flares = np.array([tstart, hb, area_box / hb, area_decay, area_decay / hb], dtype=np.double)
-    y = np.zeros(nbins, dtype=np.double)
-    for i in range(nbins):
-        ta = te[i]
-        tb = te[i+1]
-        value = 0
-        for j in range(nflares):
-            t0 = flares[0,j]
-            if t0 >= tb:
-                continue
-
-            w = flares[2,j]
-            h = flares[1,j]
-            t1 = t0 + w
-
-            # t0 < tb
-            # box
-            if t1 > ta: # else fully beyond box
-                if t0 > ta:
-                    if t1 < tb: # box fully within
-                        value += h * w * (t1 - t0)/(tb - ta)
-                    else: # box starts within
-                        value += h * (tb - t0)/(tb - ta)
-                else:
-                    if t1 < tb: # box ends within
-                        value += h * (t1 - ta)/(tb - ta)
-                    else: # box fully covers
-                        value += h
-
-            # exponential
-            if t1 >= tb:
-                continue
-            else: # t1 < tb
-                Ad = flares[3,j]
-                tau = flares[4,j]
-                if t1 > ta:
-                    value += Ad * (1 - np.exp((t1 - tb)/tau))
-                else:
-                    value += Ad * (np.exp((t1 - ta)/tau) - np.exp((t1 - tb)/tau))
-        y[i] = value
-
-    return y
-#endregion
-
-
 #region front end functions
 @u.quantity_input(eqd=u.AA, filter_response=u.Unit(''))
 def filter_to_SiIV_energy(filter_wave, filter_response, energy, **flare_params):
@@ -559,7 +472,7 @@ def filter_to_SiIV_energy(filter_wave, filter_response, energy, **flare_params):
         Filter response at filter_wave.
     energy : float or astropy quantity, units of energy
         Energy of the flare in the specified filter.
-    {}
+    {flare_params}
 
     Returns
     -------
@@ -681,7 +594,7 @@ def flare_series(time_span, **flare_params):
     eqd = power_rv(eqd_min, eqd_max, cumulative_index, n) * tunit
 
     return t_flare, eqd
-_format_doc(flare_series, flare_params=_flare_params_doc('eqd_min', 'eqd_max', 'cumulative_index'))
+_format_doc(flare_series, flare_params=_get_param_string('eqd_min', 'eqd_max', 'cumulative_index'))
 
 
 @u.quantity_input(tbins=u.s)
@@ -693,7 +606,8 @@ def flare_series_lightcurve(tbins, return_flares=False, **flare_params):
     ----------
     {tbins}
     return_flares : bool
-        If True, return the start times and equivalent durations of the flares.
+        If True, return the start times and equivalent durations of
+        the flares.
     {flare_params}
 
     Returns
@@ -731,17 +645,20 @@ def flare_spectrum(wbins, SiIV, **flare_params):
     ----------
     {wbins}
     SiIV : float or astropy quantity
-        Equivalent duration or energy of the flare in the Si IV 1393,1402 AA line. This could also be peak flux or some
-        other quantity, but note that you should probably specificy your own 'Edensity' column of  the
+        Equivalent duration or energy of the flare in the Si IV 1393,1402 AA
+        line. This could also be peak flux or some other quantity, but note
+        that you should probably specificy your own 'Edensity' column of  the
         SiIV_normed_flare_spec table to match if so.
     {flare_params}
 
     Returns
     -------
     spectrum : astropy quantity array, units variabile according to units of SiIV
-        Energy spectral density or other spectral density of the flare spectrum in each wbin.
+        Energy spectral density or other spectral density of the flare spectrum
+        in each wbin.
     """
-    BBratio, T, flarespec = _kw_or_default(flare_params, ['BB_SiIV_Eratio', 'T_BB', 'SiIV_normed_flare_spec'])
+    BBratio, T, flarespec, clip_BB  = _kw_or_default(flare_params, ['BB_SiIV_Eratio', 'T_BB', 'SiIV_normed_flare_spec',
+                                                            'clip_BB'])
 
     # rebin energy density from specified flare SED (from MUSCLES data by default)
     fs_bins = np.append(flarespec['w0'], flarespec['w1'][-1]) * flarespec['w0'].unit
@@ -749,14 +666,20 @@ def flare_spectrum(wbins, SiIV, **flare_params):
     fs_bins = fs_bins.to(wbins.unit)
     FUV_and_lines = rebin(wbins.value, fs_bins.value, fs_density.value) * fs_density.unit * SiIV
 
-    # get the blackbody (should not be included in SED) emission in each bin
-    red = (wbins[1:] > fuv[1])
-    BBbins = np.insert(wbins[1:][red], 0, fuv[1])
-    BB = blackbody_binned(BBbins, T, bolometric=BBratio * SiIV)
+    # get the blackbody (should not be included in SED) emission in each bin. Add to regions shortward of FUV as
+    # desired by user
+    BBbolo = BBratio * SiIV
+    if clip_BB:
+        red = (wbins[1:] > fuv[1])
+        BBbins = np.insert(wbins[1:][red], 0, fuv[1])
+        BB = blackbody_binned(BBbins, T, bolometric=BBbolo)
 
-    # add SED and blackbody
-    result = FUV_and_lines
-    result[red] += BB
+        # add SED and blackbody
+        result = FUV_and_lines
+        result[red] += BB
+    else:
+        BB = blackbody_binned(wbins, T, bolometric=BBbolo)
+        result = FUV_and_lines + BB
 
     return result
 _format_doc(flare_spectrum, wbins=_wbins_doc,
@@ -780,8 +703,9 @@ def flare_spectra(wbins, tbins, t0, eqd, **flare_params):
     Returns
     -------
     spectra : astropy quantity array, variable units
-        Array of spectra in each tbin, where the array has dimensions (len(tbins)-1, len(wbins)-1). Units will match
-        the product of the eqd and SiIV_quiescent units, divided by time and length.
+        Array of spectra in each tbin, where the array has dimensions
+        (len(tbins)-1, len(wbins)-1). Units will match the product
+        of the eqd and SiIV_quiescent units, divided by time and length.
     """
     # get quiescent Si IV flux
     SiIVq, = _kw_or_default(flare_params, ['SiIV_quiescent'])
@@ -813,8 +737,9 @@ def flare_series_spectra(wbins, tbins, **flare_params):
     Returns
     -------
     spectra : astropy quantity array
-        Array of spectra in each tbin, where the array has dimensions (len(tbins)-1, len(wbins)-1). Units will match
-        the product of the eqd and SiIV_quiescent units, divided by time and length.
+        Array of spectra in each tbin, where the array has dimensions
+        (len(tbins)-1, len(wbins)-1). Units will match the product of
+        the eqd and SiIV_quiescent units, divided by time and length.
     """
     # get quiescent Si IV flux
     SiIVq, = _kw_or_default(flare_params, ['SiIV_quiescent'])
