@@ -34,8 +34,8 @@ For more information on units with `astropy`, see [the docs](http://docs.astropy
 #### Integration
 Be aware that `fiducial_flare` integrates over spectral and temporal bins to ensure that energy is conserved when bins are changed. In contrast, it is standard practice for many to compute spectral density or rates at the midpoint of a wavelength or time bin. `fiducial flare` integrates the value over the bin and divides by the bin width to give the average value.
 
-### Referencing This Work
-Please acknowledge your use of this work by citing Loyd et al. 2018, ApJ in press (paper V in the MUSCLES series) and specifying the version (`flare_simulator.version`).
+### Referencing This Work (Credit)
+Please acknowledge your use of this work by citing Loyd et al. 2018, ApJ in press (http://arxiv.org/abs/1809.07322) paper V in the MUSCLES series) and specifying the version (`flare_simulator.version`).
 
 
 ### Example Use
@@ -193,7 +193,7 @@ si4_fluence = 1.0
 e = flaresim.flare_spectrum(wbins, si4_fluence, **flare_params)
 ## - or - we could specify a blackbody temperature and turn off
 ## clipping as keywords
-e = flaresim.flare_spectrum(wbins, si4_fluence, T_BB=1e4*u.K)
+e = flaresim.flare_spectrum(wbins, si4_fluence, T_BB=1e4*u.K, clip_BB=False)
 
 plt.figure()
 plt.step(wbins[:-1], e, where='post')
