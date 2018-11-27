@@ -104,6 +104,45 @@ plt.ion()
 from fiducial_flare import flare_simulator as flaresim
 
 # --------
+# get a lightcurve  of  spectral  energy density within
+# a single bandpass for a  flare
+
+# let's go with a 10 ks flare starting 100 s into the
+# "observation"
+t0 = 100. * u.s
+eqd = 10 * u.ks
+
+# we need to set the absolute flux level  of the flare
+# this is done by setting  the  Si IV flux, since
+# everything is  normalized to Si IV. Let's go with
+# 1 erg/s/cm2 (reasonable for a planet orbiting an
+# active star with T_eq = 270 K)
+flare_params = flaresim.flare_defaults.copy()
+flare_params['SiIV_quiescent'] = 1*u.Unit('erg s-1 cm-2')
+
+# make some time bins. Let's go coarse
+tbins = np.arange(0, 1000, 60.) * u.s
+
+# pick  the bandpass. How about all of the FUV?
+wbins = [912, 1700] * u.AA
+
+# get time-evolving spectra
+spectra = flaresim.flare_spectra(wbins, tbins, t0, eqd)
+
+# but there is only one broad wavelength, so get rid
+# of the wavelength  dimension
+flux_density = np.squeeze(spectra)
+
+# plot it up!
+plt.figure()
+plt.step(tbins[:-1], flux_density, where='post')
+plt.xlabel('Time [s]')
+plt.ylabel('{} Flux Density (erg s-1 cm-2 AA-1)'.format(wbins))
+# --------
+
+
+
+# --------
 # create and plot the standard lightcurve for a flare
 # with a 10 ks equivalent duration.
 tbins = np.linspace(0, 1000, 1000) * u.s
@@ -122,7 +161,6 @@ dt = np.diff(tbins)
 area = np.sum(dt*y)
 print area
 # --------
-
 
 
 
@@ -145,6 +183,7 @@ plt.ylabel('Normalized Spectral Energy Density [$\AA^{-1}$]')
 # --------
 
 
+
 # --------
 # generate a random series of flares from the default FFD and plot the lightcurve for them
 time_span = 1e5*u.s
@@ -164,6 +203,7 @@ plt.step(tbins[:-1], y, where='post')
 plt.xlabel('Time [s]')
 plt.ylabel('Quiescent-Normalized Flux')
 # --------
+
 
 
 # --------
