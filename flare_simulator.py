@@ -723,7 +723,7 @@ _format_doc(flare_spectra, wbins=_wbins_doc, tbins=_tbins_doc, t0=_t0_doc, eqd=_
                                            'BB_SiIV_Eratio', 'T_BB', 'SiIV_normed_flare_spec'))
 
 
-@u.quantity_input(wbins=u.s, tbins=u.s)
+@u.quantity_input(wbins=u.AA, tbins=u.s)
 def flare_series_spectra(wbins, tbins, **flare_params):
     """
     Generate time-evolving spectra from a random series of flares.
