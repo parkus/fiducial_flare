@@ -481,11 +481,11 @@ def filter_to_SiIV_energy(filter_wave, filter_response, energy, **flare_params):
     """
 
     # get filter-convolved fraction of flare energy relative to Si IV
-    w_sample = np.linspace(filter_wave[0], filter_wave[-1], len(filter_wave)*100)
-    flux = flare_spectrum(w_sample, 1.0, **flare_params)
-    w_mid = (w_sample[1:] + w_sample[:-1])/2.0
-    response = np.interp(w_mid, filter_wave, filter_response)
-    filter_fraction = np.trapz(response*flux, w_mid)
+    w_mids = (filter_wave[1:] + filter_wave[:-1])/2.
+    w_bins = np.insert(w_mids.value, [0,len(w_mids)],
+                       filter_wave[[0,-1]].value)*filter_wave.unit
+    flux = flare_spectrum(w_bins, 1.0, **flare_params)
+    filter_fraction = np.sum(filter_response*flux*np.diff(w_bins))
 
     # then just invert to get the energy in Si IV given the filter energy
     return energy/filter_fraction
