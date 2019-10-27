@@ -1,3 +1,4 @@
+
 from astropy import table, constants as const, units as u
 import numpy as np
 import os
@@ -53,9 +54,10 @@ def _check_unit(func, var, unit):
     """Boilerplate for checking units of a variable."""
     try:
         var.to(unit)
-    except AttributeError, u.UnitConversionError:
-        raise('Variable {} supplied to the {} must be an astropy.Units.Quantity object with units convertable to {}'
-              ''.format(var.__name__, func.__name__, unit))
+    except (AttributeError, u.UnitConversionError):
+        raise ValueError('Variable {} supplied to the {} must be an '
+                         'astropy.Units.Quantity object with units '
+                         'convertable to {}'.format(var, func, unit))
 
 
 def _integrate_spec_table(spec_table):
@@ -143,8 +145,8 @@ def add_indent(txt):
     return "    " + txt.replace('\n', '\n    ')
 def _get_param_string(*keys):
     strings = [_param_doc_dic[key] for key in keys]
-    strings = map(add_indent, strings)
-    strings = map(add_indent, strings)
+    strings = list(map(add_indent, strings))
+    strings = list(map(add_indent, strings))
     return '\n'.join([_flare_params_doc] + strings)
 def _format_doc(func, **kws):
     func.__doc__ = func.__doc__.format(**kws)
