@@ -158,7 +158,7 @@ plt.ylabel('Quiescent-Normalized Flux')
 # verify that area under curve equals eqd
 dt = np.diff(tbins)
 area = np.sum(dt*y)
-print area
+print(area)
 # --------
 
 
@@ -194,7 +194,7 @@ y, flares = flaresim.flare_series_lightcurve(tbins, return_flares=True)
 t_flare, eqds = flares
 from astropy import table
 flare_tbl = table.Table((t_flare, eqds), names=('Start Time', 'Equivalent Duration'))
-print flare_tbl
+print(flare_tbl)
 
 # now what does the lightcurve of these events look like?
 plt.figure()
@@ -213,7 +213,7 @@ plt.ylabel('Quiescent-Normalized Flux')
 flare_params = flaresim.flare_defaults.copy()
 
 # what can we play with?
-print flare_params.keys()
+print(flare_params.keys())
 
 # change the BB temperature to 10,000 K
 flare_params['T_BB'] = 1e4 * u.K
