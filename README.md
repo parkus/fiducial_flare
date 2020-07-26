@@ -35,8 +35,7 @@ For more information on units with `astropy`, see [the docs](http://docs.astropy
 Be aware that `fiducial_flare` integrates over spectral and temporal bins to ensure that energy is conserved when bins are changed. In contrast, it is standard practice for many to compute spectral density or rates at the midpoint of a wavelength or time bin. `fiducial flare` integrates the value over the bin and divides by the bin width to give the average value.
 
 ### Referencing This Work (Credit)
-Please acknowledge your use of this work by citing Loyd et al. 2018, ApJ in press (http://arxiv.org/abs/1809.07322) paper V in the MUSCLES series) and specifying the version (`flare_simulator.version`).
-
+Please acknowledge your use of this work by citing Loyd et al. 2018  (https://ui.adsabs.harvard.edu/abs/2018ApJ...867...71L) and specifying the version (`flare_simulator.version`).
 
 ### Example Use
 
