@@ -1,2 +1,2 @@
 
-import flare_simulator
+from . import flare_simulator
